@@ -33,7 +33,13 @@ export async function validateSessionToken(
   const [result] = await db
     .select({
       // Adjust user table here to tweak returned data
-      user: { id: table.user.id, username: table.user.username },
+      user: {
+        id: table.user.id,
+        username: table.user.username,
+        role: table.user.role,
+        profilePicture: table.user.profilePicture,
+        name: table.user.name,
+      },
       session: table.session,
     })
     .from(table.session)
@@ -80,6 +86,9 @@ interface Session {
 interface User {
   id: string;
   username: string;
+  role: "admin" | "user";
+  profilePicture: string;
+  name: string;
 }
 
 export type SessionValidationResult =
