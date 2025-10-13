@@ -1,0 +1,12 @@
+engineStrict: true
+
+ignoredBuiltDependencies:
+  - "@tailwindcss/oxide"
+  - "esbuild"
+
+overrides:
+  "drizzle-kit>@esbuild-kit/esm-loader": "npm:tsx@^4.20.4"
+
+strictDepBuilds: true
+
+strictPeerDependencies: true
