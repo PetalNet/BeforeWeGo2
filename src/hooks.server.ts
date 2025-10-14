@@ -1,28 +1,36 @@
-import type { Handle } from "@sveltejs/kit";
 import * as auth from "$lib/server/auth";
+import { Effect } from "effect";
+import { ORM } from "$lib/server/db/index.ts";
 
-const handleAuth: Handle = async ({ event, resolve }) => {
-  const sessionToken = event.cookies.get(auth.sessionCookieName);
+export const handle = async ({ event, resolve }): Promise<Response> =>
+  await Effect.gen(function* () {
+    const sessionToken = event.cookies.get(auth.sessionCookieName);
 
-  if (!sessionToken) {
-    event.locals.user = null;
-    event.locals.session = null;
-    return resolve(event);
-  }
+    if (!sessionToken) {
+      event.locals.user = undefined;
+      event.locals.session = undefined;
+    } else {
+      const { session, user } = yield* auth.validateSessionToken(sessionToken);
 
-  const { session, user } = await auth.validateSessionToken(sessionToken);
+      if (session) {
+        yield* auth.setSessionTokenCookie(
+          event,
+          sessionToken,
+          session.expiresAt,
+        );
+      } else {
+        yield* auth.deleteSessionTokenCookie(event);
+      }
 
-  if (session) {
-    auth.setSessionTokenCookie(event, sessionToken, session.expiresAt);
-  } else {
-    auth.deleteSessionTokenCookie(event);
-  }
+      event.locals.user = user;
+      event.locals.session = session;
+    }
 
-  event.locals.user = user;
-  event.locals.session = session;
-  return resolve(event, {
-    preload: ({ type }) => type === "font" || type === "js" || type === "css",
-  });
-};
-
-export const handle: Handle = handleAuth;
+    return yield* Effect.promise(
+      async () =>
+        await resolve(event, {
+          preload: ({ type }) =>
+            type === "font" || type === "js" || type === "css",
+        }),
+    );
+  }).pipe(Effect.provide(ORM.Client), Effect.runPromise);

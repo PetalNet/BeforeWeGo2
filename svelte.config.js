@@ -1,7 +1,7 @@
 import adapter from "@sveltejs/adapter-auto";
 import { vitePreprocess } from "@sveltejs/vite-plugin-svelte";
 
-const config: import("@sveltejs/kit").Config = {
+export default /** @satisfies {import("@sveltejs/kit").Config} */ ({
   // Consult https://svelte.dev/docs/kit/integrations
   // for more information about preprocessors
   preprocess: vitePreprocess({ style: false }),
@@ -17,9 +17,10 @@ const config: import("@sveltejs/kit").Config = {
     },
 
     typescript: {
-      config(config) {
-        config["include"] = (config["include"] as string[]).map(
-          (path: string) => path.replace("vite.config", "*.config"),
+      // eslint-disable-next-line @typescript-eslint/explicit-function-return-type -- JS
+      config(/** @type {Record<string, unknown>} */ config) {
+        config["include"] = /** @type {string[]} */ (config["include"]).flatMap(
+          (path) => path.replace("vite.config", "*.config"),
         );
       },
     },
@@ -30,6 +31,4 @@ const config: import("@sveltejs/kit").Config = {
       async: true,
     },
   },
-};
-
-export default config;
+});

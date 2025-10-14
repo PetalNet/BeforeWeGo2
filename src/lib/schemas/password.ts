@@ -8,7 +8,7 @@ export const Password = Schema.String.pipe(
     description: "A password",
   }),
   Schema.brand("Password"),
-  Schema.annotations({ title: "Password" }),
+  Schema.Redacted,
 );
 
 export type Password = typeof Password.Type;

@@ -1,36 +1,9 @@
 <script lang="ts">
   import { resolve } from "$app/paths";
+  import Polaroid, { type Song } from "../components/Polaroid.svelte";
+  import { getCohort } from "./cohort.remote.ts";
 
-  type CohortInfo = { year: string; count: number; domain: string };
-  type Classmate = {
-    id: string;
-    profilePicture?: string | null;
-    name?: string | null;
-    graduationYear?: string | number | null;
-    favoriteMemoryPhoto?: string | null;
-    favoriteSong?: string | null;
-    favoriteArtist?: string | null;
-    spotifyTrackId?: string | null;
-  };
-
-  type PageData = {
-    users?: Classmate[];
-    user?: Record<string, unknown> | null;
-    cohortInfo?: CohortInfo;
-  };
-
-  interface Props {
-    data?: PageData;
-  }
-
-  let { data = {} }: Props = $props();
-
-  // Provide safe defaults for template rendering
-  const {
-    users = [] as Classmate[],
-    user = null,
-    cohortInfo = { year: "", count: 0, domain: "" } as CohortInfo,
-  } = data;
+  const { users, user, cohortInfo } = await getCohort();
 
   // Rotations for the polaroids
   const rotations = [
@@ -44,41 +17,46 @@
   ];
 
   // Function to get a rotation for each user
-  const getRotation = (index: number) => rotations[index % rotations.length];
+  function getRotation(index: number): string | undefined {
+    return rotations[index % rotations.length];
+  }
 </script>
 
-<main class="theme-container">
-  {#if user && cohortInfo}
-    <header class="mb-8 p-4 text-center">
-      <h1 class="mb-2 text-4xl text-gray-800">
-        Before We Go – Class of {cohortInfo.year}
-      </h1>
-      <p class="m-0 text-lg text-gray-600">
-        {cohortInfo.count}
-        {cohortInfo.count === 1 ? "student" : "students"} from {cohortInfo.domain}
-      </p>
-    </header>
-  {/if}
+<main>
+  <header class="mb-8 p-4 text-center">
+    <h1 class="mb-2 text-4xl text-gray-800">
+      Before We Go – Class of {cohortInfo.year}
+    </h1>
+    <p class="m-0 text-lg text-gray-600">
+      {cohortInfo.count} student{cohortInfo.count > 1 ? "s" : ""} from {cohortInfo.domain}
+    </p>
+  </header>
 
-  <section class="theme-gallery">
+  <section>
     {#if users.length > 0}
       {#each users as classmate, index (classmate.id)}
-        <!-- You can wire spotifyTrackId/albumImage here if those fields exist on the user object -->
-        <!-- <Polaroid
+        <Polaroid
           rotation={getRotation(index)}
-          photo={classmate.profilePicture ?? "/default-cover.png"}
-          alt={(classmate.name ?? "") + "'s profile"}
-          caption={classmate.name ?? ""}
-          year={classmate.graduationYear ?? ""}
+          name={classmate.name}
+          photo={classmate.profilePicture}
+          year={classmate.graduationYear}
           clickable={true}
           href={resolve(`/profile/[user]`, {
             user: classmate.id,
           })}
-          memoryPhoto={classmate.favoriteMemoryPhoto ?? undefined}
-          songTitle={classmate.favoriteSong ?? undefined}
-          songArtist={classmate.favoriteArtist ?? undefined}
-          spotifyTrackId={classmate.spotifyTrackId ?? undefined}
-        /> -->
+          memoryPhoto={classmate.favoriteMemoryPhoto}
+          favoriteSong={classmate.favoriteSong &&
+          classmate.favoriteArtist &&
+          classmate.spotifyTrackId
+            ? ({
+                title: classmate.favoriteSong,
+                artist: classmate.favoriteArtist,
+                spotifyTrackId: classmate.spotifyTrackId,
+              } satisfies Song)
+            : undefined}
+          cries={0}
+          likes={0}
+        />
       {/each}
     {:else if user}
       <!-- Show message if no cohort members found -->

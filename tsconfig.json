@@ -19,8 +19,6 @@
     // Style Options
     "noImplicitReturns": true,
     "noImplicitOverride": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
     "noPropertyAccessFromIndexSignature": true,
 
@@ -31,7 +29,16 @@
     "erasableSyntaxOnly": true,
     "noUncheckedSideEffectImports": true,
     "moduleDetection": "force",
-    "skipLibCheck": true
+    "skipLibCheck": true,
+
+    "allowJs": true,
+    "checkJs": true,
+
+    "plugins": [
+      {
+        "name": "@effect/language-service"
+      }
+    ]
   }
   // Path aliases are handled by https://svelte.dev/docs/kit/configuration#alias
   // except $lib which is handled by https://svelte.dev/docs/kit/configuration#files

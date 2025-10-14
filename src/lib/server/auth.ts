@@ -2,8 +2,10 @@ import type { RequestEvent } from "@sveltejs/kit";
 import { eq } from "drizzle-orm";
 import { sha256 } from "@oslojs/crypto/sha2";
 import { encodeBase64url, encodeHexLowerCase } from "@oslojs/encoding";
-import { db } from "$lib/server/db";
+import { ORM } from "$lib/server/db";
 import * as table from "$lib/server/db/schema";
+import { Effect } from "effect";
+import type { SqlError } from "@effect/sql/SqlError";
 
 const DAY_IN_MS = 1000 * 60 * 60 * 24;
 
@@ -15,64 +17,83 @@ export function generateSessionToken() {
   return token;
 }
 
-export async function createSession(token: string, userId: string) {
-  const sessionId = encodeHexLowerCase(sha256(new TextEncoder().encode(token)));
-  const session: table.Session = {
-    id: sessionId,
-    userId,
-    expiresAt: new Date(Date.now() + DAY_IN_MS * 30),
-  };
-  await db.insert(table.session).values(session);
-  return session;
-}
+export const createSession = (token: string, userId: string) =>
+  Effect.gen(function* () {
+    const sessionId = encodeHexLowerCase(
+      sha256(new TextEncoder().encode(token)),
+    );
+    const session: table.Session = {
+      id: sessionId,
+      userId,
+      expiresAt: new Date(Date.now() + DAY_IN_MS * 30),
+    };
 
-export async function validateSessionToken(
+    const db = yield* ORM;
+    yield* db.insert(table.session).values(session);
+
+    return session;
+  });
+
+export const validateSessionToken = (
   token: string,
-): Promise<SessionValidationResult> {
-  const sessionId = encodeHexLowerCase(sha256(new TextEncoder().encode(token)));
-  const [result] = await db
-    .select({
-      // Adjust user table here to tweak returned data
-      user: {
-        id: table.user.id,
-        username: table.user.username,
-        role: table.user.role,
-        profilePicture: table.user.profilePicture,
-        name: table.user.name,
-      },
-      session: table.session,
-    })
-    .from(table.session)
-    .innerJoin(table.user, eq(table.session.userId, table.user.id))
-    .where(eq(table.session.id, sessionId));
+): Effect.Effect<SessionValidationResult, SqlError, ORM> =>
+  Effect.gen(function* () {
+    const sessionId = encodeHexLowerCase(
+      sha256(new TextEncoder().encode(token)),
+    );
 
-  if (!result) {
-    return { session: null, user: null };
-  }
-  const { session, user } = result;
+    const db = yield* ORM;
 
-  const sessionExpired = Date.now() >= session.expiresAt.getTime();
-  if (sessionExpired) {
-    await db.delete(table.session).where(eq(table.session.id, session.id));
-    return { session: null, user: null };
-  }
+    const [result]: { user: User; session: Session }[] = yield* db
+      .select({
+        // Adjust user table here to tweak returned data
+        user: {
+          id: table.user.id,
+          email: table.user.personalEmail,
+          role: table.user.role,
+          profilePicture: table.user.profilePicture,
+          name: table.user.name,
+          graduationYear: table.user.graduationYear,
+          schoolDomain: table.user.schoolDomain,
+          favoriteMemoryPhoto: table.user.favoriteMemoryPhoto,
+        },
+        session: table.session,
+      })
+      .from(table.session)
+      .innerJoin(table.user, eq(table.session.userId, table.user.id))
+      .where(eq(table.session.id, sessionId));
 
-  const renewSession =
-    Date.now() >= session.expiresAt.getTime() - DAY_IN_MS * 15;
-  if (renewSession) {
-    session.expiresAt = new Date(Date.now() + DAY_IN_MS * 30);
-    await db
-      .update(table.session)
-      .set({ expiresAt: session.expiresAt })
-      .where(eq(table.session.id, session.id));
-  }
+    if (!result) {
+      return { session: undefined, user: undefined };
+    }
+    const { session, user } = result;
 
-  return { session, user };
-}
+    const sessionExpired = Date.now() >= session.expiresAt.getTime();
+    if (sessionExpired) {
+      yield* Effect.promise(() =>
+        db.delete(table.session).where(eq(table.session.id, session.id)),
+      );
+      return { session: undefined, user: undefined };
+    }
+
+    const renewSession =
+      Date.now() >= session.expiresAt.getTime() - DAY_IN_MS * 15;
+    if (renewSession) {
+      session.expiresAt = new Date(Date.now() + DAY_IN_MS * 30);
+      yield* Effect.promise(() =>
+        db
+          .update(table.session)
+          .set({ expiresAt: session.expiresAt })
+          .where(eq(table.session.id, session.id)),
+      );
+    }
+
+    return { session, user };
+  });
 
 interface SessionValidationResultNone {
-  session: null;
-  user: null;
+  session: undefined;
+  user: undefined;
 }
 interface SessionValidationResultSome {
   session: Session;
@@ -83,35 +104,56 @@ interface Session {
   userId: string;
   expiresAt: Date;
 }
-interface User {
-  id: string;
-  username: string;
-  role: "admin" | "user";
-  profilePicture: string;
-  name: string;
+
+export interface GenericUser {
+  readonly id: string;
+  readonly profilePicture: string;
+  readonly name: string;
+  readonly graduationYear: number;
+}
+
+export interface User extends GenericUser {
+  readonly role: "USER" | "ADMIN";
+  readonly schoolDomain: string;
+  readonly email: string;
+}
+
+export interface Classmate extends GenericUser {
+  readonly favoriteMemoryPhoto: string;
+  readonly favoriteSong?: string | null;
+  readonly favoriteArtist?: string | null;
+  readonly spotifyTrackId?: string | null;
 }
 
 export type SessionValidationResult =
   | SessionValidationResultNone
   | SessionValidationResultSome;
 
-export async function invalidateSession(sessionId: string) {
-  await db.delete(table.session).where(eq(table.session.id, sessionId));
-}
+export const invalidateSession = (
+  sessionId: string,
+): Effect.Effect<void, SqlError, ORM> =>
+  Effect.gen(function* () {
+    const db = yield* ORM;
+    yield* db.delete(table.session).where(eq(table.session.id, sessionId));
+  });
 
-export function setSessionTokenCookie(
+export const setSessionTokenCookie = (
   event: RequestEvent,
   token: string,
   expiresAt: Date,
-) {
-  event.cookies.set(sessionCookieName, token, {
-    expires: expiresAt,
-    path: "/",
+): Effect.Effect<void> =>
+  Effect.sync(() => {
+    event.cookies.set(sessionCookieName, token, {
+      expires: expiresAt,
+      path: "/",
+    });
   });
-}
 
-export function deleteSessionTokenCookie(event: RequestEvent) {
-  event.cookies.delete(sessionCookieName, {
-    path: "/",
+export const deleteSessionTokenCookie = (
+  event: RequestEvent,
+): Effect.Effect<void> =>
+  Effect.sync(() => {
+    event.cookies.delete(sessionCookieName, {
+      path: "/",
+    });
   });
-}

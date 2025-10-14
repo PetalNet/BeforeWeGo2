@@ -7,7 +7,6 @@ export const Email = Schema.String.pipe(
     description: "An email address",
   }),
   Schema.brand("Email"),
-  Schema.annotations({ title: "Email" }),
 );
 
 export type Email = typeof Email.Type;

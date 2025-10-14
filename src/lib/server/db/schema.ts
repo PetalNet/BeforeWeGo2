@@ -31,8 +31,8 @@ export const user = sqliteTable(
     role: text("role", { enum: userRoleEnum }).notNull().default("USER"),
 
     // Profile fields
-    profilePicture: text("profile_picture"),
-    favoriteMemoryPhoto: text("favorite_memory_photo"),
+    profilePicture: text("profile_picture").notNull(),
+    favoriteMemoryPhoto: text("favorite_memory_photo").notNull(),
     favoriteSong: text("favorite_song"),
     favoriteArtist: text("favorite_artist"),
     spotifyTrackId: text("spotify_track_id"),
