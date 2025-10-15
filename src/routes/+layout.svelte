@@ -2,23 +2,11 @@
   import "../app.css";
   import favicon from "$lib/assets/favicon.png";
   import { resolve } from "$app/paths";
-  import type { User } from "$lib/server/auth.js";
 
   let { data, children } = $props();
   let id = $props.id();
 
-  /** @deprecated */
-  const dummyUser: User = {
-    id: "",
-    role: "USER",
-    profilePicture: favicon,
-    name: "Human",
-    schoolDomain: "gmail.com",
-    email: "hello@example.com",
-    graduationYear: 1970,
-  };
-
-  let user = $derived(data?.user ?? dummyUser);
+  let user = $derived(data?.user);
   let isAdmin = $derived(user?.role === "ADMIN");
 </script>
 

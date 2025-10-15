@@ -183,11 +183,13 @@
         <div class="-mt-1 self-start pl-4">
           <h3 class="mt-1 mb-1 text-[0.9rem] italic">My Song</h3>
           <div class="flex items-center gap-2">
+            <!-- eslint-disable @typescript-eslint/no-non-null-assertion -->
             <img
               src={`/api/image-proxy?url=${encodeURIComponent(normalizedAlbumImage!)}`}
               alt="Album art"
               class="h-10 w-10 rounded-md object-cover shadow-[0_2px_4px_rgba(0,0,0,0.1)]"
             />
+            <!-- eslint-enable @typescript-eslint/no-non-null-assertion -->
             <div class="flex flex-col justify-center leading-[1.1]">
               <strong class="text-base">{favoriteSong.title}</strong>
               <small class="text-[0.8rem]">{favoriteSong.title}</small>

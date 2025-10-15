@@ -1,13 +1,12 @@
 import { getRequestEvent } from "$app/server";
-import { ORM } from "$lib/server/db/index.ts";
-import { OkQuery, query, type QueryResponse } from "$lib/server/remote/query";
-import { Redirect, type ServerError } from "$lib/server/remote/responses";
+import { ORM, sqlErrorToServerError } from "$lib/server/db/index.ts";
+import { query } from "$lib/server/remote/query";
+import { Redirect, ServerError } from "$lib/server/remote/responses";
 import { Effect, Schema } from "effect";
 import * as table from "$lib/server/db/schema";
 import { asc } from "drizzle-orm";
 import type { Classmate } from "$lib/server/auth.ts";
 import { resolve } from "$app/paths";
-import type { SqlError } from "@effect/sql";
 
 export interface CohortInfo {
   readonly year: number;
@@ -23,12 +22,12 @@ export interface Cohort {
 
 export const getCohort = query(
   Schema.Void,
-  (): Effect.Effect<QueryResponse<Cohort>, ServerError | SqlError.SqlError> =>
+  (): Effect.Effect<Cohort, ServerError | Redirect> =>
     Effect.gen(function* () {
       const event = getRequestEvent();
       const user = event.locals.user;
       if (!user) {
-        return new Redirect({ to: resolve("/login"), code: 302 });
+        return yield* new Redirect({ to: resolve("/login"), code: 302 });
       }
 
       const db = yield* ORM;
@@ -44,9 +43,10 @@ export const getCohort = query(
           spotifyTrackId: table.user.spotifyTrackId,
         })
         .from(table.user)
-        .orderBy(asc(table.user.name));
+        .orderBy(asc(table.user.name))
+        .pipe(sqlErrorToServerError);
 
-      const data = {
+      return {
         users: cohortUsers,
         user: {
           id: user.id,
@@ -59,8 +59,6 @@ export const getCohort = query(
           year: user.graduationYear,
           count: cohortUsers.length,
         },
-      } satisfies Cohort;
-
-      return new OkQuery<Cohort>({ data });
+      };
     }).pipe(Effect.provide(ORM.Client)),
 );

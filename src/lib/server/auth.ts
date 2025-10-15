@@ -11,13 +11,15 @@ const DAY_IN_MS = 1000 * 60 * 60 * 24;
 
 export const sessionCookieName = "auth-session";
 
-export function generateSessionToken() {
+export function generateSessionToken(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(18));
-  const token = encodeBase64url(bytes);
-  return token;
+  return encodeBase64url(bytes);
 }
 
-export const createSession = (token: string, userId: string) =>
+export const createSession = (
+  token: string,
+  userId: string,
+): Effect.Effect<Session, SqlError, ORM> =>
   Effect.gen(function* () {
     const sessionId = encodeHexLowerCase(
       sha256(new TextEncoder().encode(token)),
@@ -153,6 +155,7 @@ export const deleteSessionTokenCookie = (
   event: RequestEvent,
 ): Effect.Effect<void> =>
   Effect.sync(() => {
+    // eslint-disable-next-line drizzle/enforce-delete-with-where -- Not Drizzle API, just a cookie monster.
     event.cookies.delete(sessionCookieName, {
       path: "/",
     });

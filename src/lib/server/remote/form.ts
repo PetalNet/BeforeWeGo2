@@ -22,15 +22,13 @@ import {
   type Redirect,
   type ServerError,
 } from "./responses.ts";
-import type { SqlError } from "@effect/sql";
 
 export type FormResponseError =
   | BadRequest
   | Redirect
   | Forbidden
   | ServerError
-  | ValidationError
-  | SqlError.SqlError;
+  | ValidationError;
 
 export class ValidationError extends Data.TaggedError("ValidationError")<{
   readonly fieldErrors: string[];
@@ -105,11 +103,6 @@ export function form<
                 },
                 ValidationError: (validationError) =>
                   invalid(...validationError.fieldErrors),
-                SqlError: ({ message }) =>
-                  error(500, {
-                    message: message,
-                  }),
-
                 Redirect: ({ to, code }) => {
                   redirect(code, to);
                 },

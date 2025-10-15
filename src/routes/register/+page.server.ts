@@ -66,13 +66,12 @@ export const actions = {
       const session = yield* auth.createSession(sessionToken, userId);
       auth.setSessionTokenCookie(event, sessionToken, session.expiresAt);
 
-      return redirect(302, "/demo/lucia");
+      return redirect(302, resolve("/"));
     }).pipe(Effect.provide(ORM.Client), Effect.runPromise),
 };
 
 function generateUserId(): string {
   // ID with 120 bits of entropy, or about the same as UUID v4.
   const bytes = crypto.getRandomValues(new Uint8Array(15));
-  const id = encodeBase32LowerCase(bytes);
-  return id;
+  return encodeBase32LowerCase(bytes);
 }

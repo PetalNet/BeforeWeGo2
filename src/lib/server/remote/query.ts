@@ -5,34 +5,27 @@ import {
   type RemoteQueryFunction,
   type RequestEvent,
 } from "@sveltejs/kit";
-import { Schema, Effect, pipe, Exit, Cause, Match, Data } from "effect";
+import { Schema, Effect, pipe, Exit, Cause, Match } from "effect";
 import { ActionArgs } from "./form.ts";
-import type { Unify } from "effect/Unify";
 import type {
   BadRequest,
   Forbidden,
   Redirect,
   ServerError,
 } from "./responses.ts";
-import type { SqlError } from "@effect/sql";
 
-export type QueryResponse<T> = Redirect | OkQuery<T>;
 export type QueryResponseError =
   | BadRequest
+  | Redirect
   | ServerError
-  | Forbidden
-  | SqlError.SqlError;
+  | Forbidden;
 
-export const matchQueryResponse = <T>() => Match.typeTags<QueryResponse<T>>();
+// eslint-disable-next-line @typescript-eslint/explicit-function-return-type -- Just infer the freaking thingie! Pretty please?
 export const matchQueryResponseError = () =>
   Match.typeTags<QueryResponseError>();
 
-export class OkQuery<T> extends Data.TaggedClass("OkQuery")<{
-  readonly data: T;
-}> {}
-
-type QueryEffect<T> = Effect.Effect<
-  QueryResponse<T>,
+type QueryEffect<Response> = Effect.Effect<
+  Response,
   QueryResponseError,
   RequestEvent
 >;
@@ -47,7 +40,7 @@ type QueryEffect<T> = Effect.Effect<
 export function query<A, I, Output>(
   schema: Schema.Schema<A, I>,
   fn: (arg: A) => QueryEffect<Output>,
-): RemoteQueryFunction<I, Unify<Output>> {
+): RemoteQueryFunction<I, Output> {
   return remote.query(schema.pipe(Schema.standardSchemaV1), async (data) => {
     const runnable = await pipe(
       fn(data),
@@ -58,50 +51,38 @@ export function query<A, I, Output>(
       Effect.runPromiseExit,
     );
 
-    return Exit.match<
-      QueryResponse<Output>,
-      QueryResponseError,
-      never,
-      Unify<Output>
-    >(runnable, {
-      onFailure: (cause) => {
+    return Exit.getOrElse<Output, QueryResponseError, never>(
+      runnable,
+      (cause) => {
         if (Cause.isFailType(cause)) {
           return pipe(
             cause.error,
             matchQueryResponseError()({
               BadRequest: ({ message }) => {
                 error(400, {
-                  message: message ?? "Bad Request",
+                  message: message,
                 });
               },
               ServerError: ({ message }) => {
                 error(500, {
-                  message: message ?? "Internal Server Error",
+                  message: message,
                 });
               },
               Forbidden: ({ message }) => {
                 error(401, {
-                  message: message ?? "Forbidden",
+                  message: message,
                 });
               },
-              SqlError: (sqlError) =>
-                error(500, {
-                  message: sqlError.message,
-                }),
+
+              Redirect: ({ to, code }) => {
+                redirect(code, to);
+              },
             }),
           );
         }
 
         error(500, cause.toString());
       },
-      onSuccess: (data) => {
-        return matchQueryResponse<Output>()({
-          Redirect: ({ to, code }) => {
-            redirect(code, to);
-          },
-          OkQuery: ({ data }: OkQuery<Output>): Output => data,
-        })(data);
-      },
-    });
+    );
   });
 }

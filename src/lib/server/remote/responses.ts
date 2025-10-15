@@ -11,7 +11,7 @@ export type RedirectStatus =
   | 307
   | 308;
 
-export class Redirect extends Data.TaggedClass("Redirect")<{
+export class Redirect extends Data.TaggedError("Redirect")<{
   readonly to: string;
   readonly code: RedirectStatus | ({} & number);
 }> {}
